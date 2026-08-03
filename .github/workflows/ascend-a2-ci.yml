@@ -49,10 +49,12 @@ jobs:
             //   fla/utils/        - IS_NPU / device_platform detection, ascend_ub_manager
             //   fla/modules/      - pure-torch modules run on NPU in the A2 test suite
             //   tests/conftest.py - FLA_NPU_XDIST xdist worker -> device mapping
+            //   fla/ops/cp/         - context-parallel ops (chunk_delta_h triton-ascend, etc.)
+            //   tests/context_parallel/ - CP integration tests (spawn + multi-NPU)
             // Unlike the H100 'npu_only' detection, __init__.py is NOT excluded
             // here: a change to it affects the NPU backend too, so it should
             // trigger this CI.
-            const npuPattern = /^fla\/(.+\/)?backends\/triton_ascend\/|^\.github\/workflows\/ascend-|^pyproject\.toml$|^fla\/utils\/|^fla\/modules\/|^tests\/conftest\.py$/;
+            const npuPattern = /^fla\/(.+\/)?backends\/triton_ascend\/|^fla\/ops\/cp\/|^\.github\/workflows\/ascend-|^pyproject\.toml$|^fla\/utils\/|^fla\/modules\/|^tests\/conftest\.py$|^tests\/context_parallel\//;
             const related = files.filter(f => npuPattern.test(f.filename)).map(f => f.filename);
             if (related.length > 0) {
               core.info('NPU-related files changed: ' + related.join(', '));
@@ -157,3 +159,13 @@ jobs:
             tests/ops/test_gla.py \
             tests/ops/test_attnres.py \
             tests/ops/test_solve_tril.py
+
+      # CP tests spawn 2–8 HCCL ranks and need multiple visible NPUs per case.
+      - name: Run context-parallel tests (conv, gdn, token_shift)
+        shell: bash
+        run: |
+          source /usr/local/Ascend/ascend-toolkit/set_env.sh
+          pytest -s -v --exitfirst \
+            tests/context_parallel/test_cp_conv.py \
+            tests/context_parallel/test_cp_gdn.py \
+            tests/context_parallel/test_cp_token_shift.py
